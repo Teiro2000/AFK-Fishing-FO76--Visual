@@ -1,4 +1,5 @@
-﻿#SingleInstance, Force
+#Requires AutoHotkey v2.0
+#SingleInstance Force
 
 ; EASY FISHING
 
@@ -28,82 +29,83 @@ tooltipPosX := 1650
 tooltipPosY := 520
 
 ; autoFish.py passes the positions for the current resolution on the command line:
-;   AutoHotkeyU64.exe EasyFishing.ahk square1X square1Y square2X square2Y [tooltipX tooltipY]
+;   AutoHotkey64.exe EasyFishing.ahk square1X square1Y square2X square2Y [tooltipX tooltipY]
 ; Without arguments the 1920x1080 values above are used.
-if (A_Args.Length() >= 4)
+if (A_Args.Length >= 4)
 {
-	square1PosX := A_Args[1]
-	square1PosY := A_Args[2]
-	square2PosX := A_Args[3]
-	square2PosY := A_Args[4]
+	square1PosX := Integer(A_Args[1])
+	square1PosY := Integer(A_Args[2])
+	square2PosX := Integer(A_Args[3])
+	square2PosY := Integer(A_Args[4])
 }
-if (A_Args.Length() >= 6)
+if (A_Args.Length >= 6)
 {
-	tooltipPosX := A_Args[5]
-	tooltipPosY := A_Args[6]
+	tooltipPosX := Integer(A_Args[5])
+	tooltipPosY := Integer(A_Args[6])
 }
+
+; Read pixels from the whole screen, the same way autoFish.py does
+CoordMode "Pixel", "Screen"
+CoordMode "ToolTip", "Screen"
 
 
 
 ; Below this point you can change keybinds for starting and stopping fishing script
 ; Default values are f5 for starting script, f6 for reloading changes from file, and f8 for exiting
-; List of all keys: https://www.autohotkey.com/docs/v1/KeyList.htm
+; List of all keys: https://www.autohotkey.com/docs/v2/KeyList.htm
 
-f5::
+F5::
 {
 	Loop
 	{
-		PixelGetColor, color1, %square1PosX%, %square1PosY%, RGB
-		if(color1 != 0xF7A0B5)
+		color1 := PixelGetColor(square1PosX, square1PosY)
+		if (color1 != 0xF7A0B5)
 		{
-			if(showDebugTooltip) {
-				ToolTip, Not fishing, %tooltipPosX%, %tooltipPosY%
-			}
+			if (showDebugTooltip)
+				ToolTip "Not fishing", tooltipPosX, tooltipPosY
 			continue
 		}
-		if(showDebugTooltip) {
-			ToolTip, Fishing, %tooltipPosX%, %tooltipPosY%
-		}
-		PixelGetColor, color3, %square1PosX%, %square2PosY%, RGB
+		if (showDebugTooltip)
+			ToolTip "Fishing", tooltipPosX, tooltipPosY
+		color3 := PixelGetColor(square1PosX, square2PosY)
 		state := getBlue(color3)
-		if(state == 5)
+		if (state == 5)
 		{
 			isMinigame := true
-			while(isMinigame)
+			while (isMinigame)
 			{
-				PixelGetColor, color2, %square2PosX%, %square1PosY%, RGB
+				color2 := PixelGetColor(square2PosX, square1PosY)
 				xPos := getRed(color2) - 150
 				yPos := getGreen(color2) - 150
-				if(xPos != -150 || yPos != -150)
+				if (xPos != -150 || yPos != -150)
 				{
-					DllCall("mouse_event", "UInt", 0x1, "UInt", xPos * 5, "UInt", yPos * 5)
+					; Relative mouse move; "Int" so negative values go through as-is
+					DllCall("mouse_event", "UInt", 0x1, "Int", xPos * 5, "Int", yPos * 5, "UInt", 0, "UPtr", 0)
 				}
 				else
 				{
 					isMinigame := false
 				}
-				if(showDebugTooltip) {
-					ToolTip, Minigame (x:%xPos% y:%yPos%), %tooltipPosX%, %tooltipPosY%
-				}
+				if (showDebugTooltip)
+					ToolTip "Minigame (x:" xPos " y:" yPos ")", tooltipPosX, tooltipPosY
 			}
 		}
-		Sleep, 20
+		Sleep 20
 	}
 }
-return
 
-f6::Reload
-return
+F6::Reload
 
 F8::ExitApp
 
 
-getRed(s) {
-	Return, Format("{:i}", "0x" . SubStr(s,3,2))*1
+; PixelGetColor returns "0xRRGGBB"
+getRed(color) {
+	return (Integer(color) >> 16) & 0xFF
 }
-getGreen(s) {
-	Return, Format("{:i}", "0x" . SubStr(s,5,2))*1
+getGreen(color) {
+	return (Integer(color) >> 8) & 0xFF
 }
-getBlue(s) {
-	Return, Format("{:i}", "0x" . SubStr(s,7,2))*1
+getBlue(color) {
+	return Integer(color) & 0xFF
 }

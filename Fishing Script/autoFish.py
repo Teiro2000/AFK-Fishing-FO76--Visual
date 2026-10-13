@@ -10,23 +10,35 @@ import mss
 import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-AHK_EXE = r"C:\Program Files\AutoHotkey\UX\AutoHotkeyUX.exe"
-# EasyFishing.ahk is AutoHotkey v1 syntax, which AutoHotkeyUX.exe would run
-# as v2 - so it needs the v1 interpreter directly
-AHK_DIR = r"C:\Program Files\AutoHotkey"
+# Admin installs go to Program Files, per-user installs to LocalAppData
+AHK_DIRS = [
+    os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "AutoHotkey"),
+    os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "AutoHotkey"),
+]
 
 
-def find_ahk_v1():
-    # The v1.1 installer puts it in the AutoHotkey folder itself; when the v2
-    # launcher downloads v1 it goes into a versioned subfolder (e.g. v1.1.37.02)
-    root = os.path.join(AHK_DIR, "AutoHotkeyU64.exe")
-    if os.path.exists(root):
-        return root
-    found = glob.glob(os.path.join(AHK_DIR, "v1*", "AutoHotkeyU64.exe"))
-    # Newest version first (compare numerically so 1.1.37 beats 1.1.9)
-    found.sort(key=lambda p: [int(n) for n in re.findall(r"\d+", os.path.basename(os.path.dirname(p)))],
-               reverse=True)
-    return found[0] if found else None
+def find_ahk_v2():
+    """Path to the AutoHotkey v2 interpreter, or None.
+
+    Run directly rather than through the AutoHotkeyUX.exe launcher, so the
+    EasyFishing process we start is the one we can stop again.
+    """
+    for ahk_dir in AHK_DIRS:
+        exe = os.path.join(ahk_dir, "v2", "AutoHotkey64.exe")
+        if os.path.exists(exe):
+            return exe
+        # Extra versions installed through the launcher go in e.g. v2.0.19
+        found = glob.glob(os.path.join(ahk_dir, "v2*", "AutoHotkey64.exe"))
+        if found:
+            # Newest first (compare numerically so 2.0.19 beats 2.0.9)
+            return max(found, key=lambda p: [int(n) for n in re.findall(
+                r"\d+", os.path.basename(os.path.dirname(p)))])
+    return None
+
+
+def run_ahk(script, *args):
+    return subprocess.Popen([find_ahk_v2(), os.path.join(SCRIPT_DIR, script), *map(str, args)],
+                            cwd=SCRIPT_DIR)
 
 
 # All coordinates below are for 1920x1080 and get scaled to the actual
@@ -77,7 +89,7 @@ STATE_REELING = "reeling"      # EasyFishing is playing the minigame
 
 
 def press_e():
-    subprocess.Popen([AHK_EXE, os.path.join(SCRIPT_DIR, "press_e.ahk")])
+    run_ahk("press_e.ahk")
 
 
 class Screen:
@@ -209,24 +221,13 @@ class Fisher:
 
     def _start_easy_fishing(self, screen):
         square1, square2 = screen.easy_fishing_squares(self.settings)
-        ahk_v1 = find_ahk_v1()
-        if ahk_v1:
-            tooltip = (round(1650 * screen.scale), round(520 * screen.scale))
-            self.log(f"Launching EasyFishing.ahk - squares ({square1},{square1}) / ({square2},{square2})")
-            cmd = [ahk_v1, os.path.join(SCRIPT_DIR, "EasyFishing.ahk"),
-                   *map(str, (square1, square1, square2, square2, *tooltip))]
-        else:
-            # easyFishing.exe is a precompiled build with the 1080p positions
-            self.log("AutoHotkey v1 not found - launching easyFishing.exe (1080p only)")
-            if (square1, square2) != (2, 7):
-                self.log(f"WARNING: this resolution needs squares ({square1},{square1}) / "
-                         f"({square2},{square2}) - install AutoHotkey v1 for the minigame to work")
-            cmd = [os.path.join(SCRIPT_DIR, "easyFishing.exe")]
-        self._easy_fishing = subprocess.Popen(cmd, cwd=SCRIPT_DIR)
+        tooltip = (round(1650 * screen.scale), round(520 * screen.scale))
+        self.log(f"Launching EasyFishing.ahk - squares ({square1},{square1}) / ({square2},{square2})")
+        self._easy_fishing = run_ahk("EasyFishing.ahk", square1, square1, square2, square2, *tooltip)
         if self._stop.wait(1.5):  # give it time to load and register the F5 hotkey
             return
         self.log("Starting EasyFishing loop (F5)")
-        subprocess.Popen([AHK_EXE, os.path.join(SCRIPT_DIR, "press_f5.ahk")])
+        run_ahk("press_f5.ahk")
 
     def _run(self):
         screen = Screen()
@@ -237,6 +238,9 @@ class Fisher:
         self._bobber_gone_since = None
         self._cast_seen_since = None
 
+        if not find_ahk_v2():
+            self.log("AutoHotkey v2 not found - install it from autohotkey.com and press Start again")
+            return
         self.log(f"Screen: {screen.describe()}")
         self._start_easy_fishing(screen)
         self.log("Watching the screen")
