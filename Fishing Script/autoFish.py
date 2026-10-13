@@ -1,5 +1,7 @@
+import glob
 import math
 import os
+import re
 import subprocess
 import threading
 import time
@@ -11,7 +13,21 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AHK_EXE = r"C:\Program Files\AutoHotkey\UX\AutoHotkeyUX.exe"
 # EasyFishing.ahk is AutoHotkey v1 syntax, which AutoHotkeyUX.exe would run
 # as v2 - so it needs the v1 interpreter directly
-AHK_V1_EXE = r"C:\Program Files\AutoHotkey\AutoHotkeyU64.exe"
+AHK_DIR = r"C:\Program Files\AutoHotkey"
+
+
+def find_ahk_v1():
+    # The v1.1 installer puts it in the AutoHotkey folder itself; when the v2
+    # launcher downloads v1 it goes into a versioned subfolder (e.g. v1.1.37.02)
+    root = os.path.join(AHK_DIR, "AutoHotkeyU64.exe")
+    if os.path.exists(root):
+        return root
+    found = glob.glob(os.path.join(AHK_DIR, "v1*", "AutoHotkeyU64.exe"))
+    # Newest version first (compare numerically so 1.1.37 beats 1.1.9)
+    found.sort(key=lambda p: [int(n) for n in re.findall(r"\d+", os.path.basename(os.path.dirname(p)))],
+               reverse=True)
+    return found[0] if found else None
+
 
 # All coordinates below are for 1920x1080 and get scaled to the actual
 # monitor (game in borderless fullscreen, 16:9 HUD). Values were calibrated
@@ -193,10 +209,11 @@ class Fisher:
 
     def _start_easy_fishing(self, screen):
         square1, square2 = screen.easy_fishing_squares(self.settings)
-        if os.path.exists(AHK_V1_EXE):
+        ahk_v1 = find_ahk_v1()
+        if ahk_v1:
             tooltip = (round(1650 * screen.scale), round(520 * screen.scale))
             self.log(f"Launching EasyFishing.ahk - squares ({square1},{square1}) / ({square2},{square2})")
-            cmd = [AHK_V1_EXE, os.path.join(SCRIPT_DIR, "EasyFishing.ahk"),
+            cmd = [ahk_v1, os.path.join(SCRIPT_DIR, "EasyFishing.ahk"),
                    *map(str, (square1, square1, square2, square2, *tooltip))]
         else:
             # easyFishing.exe is a precompiled build with the 1080p positions
