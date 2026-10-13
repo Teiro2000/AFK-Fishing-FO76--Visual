@@ -27,6 +27,22 @@ showDebugTooltip := true
 tooltipPosX := 1650
 tooltipPosY := 520
 
+; autoFish.py passes the positions for the current resolution on the command line:
+;   AutoHotkeyU64.exe EasyFishing.ahk square1X square1Y square2X square2Y [tooltipX tooltipY]
+; Without arguments the 1920x1080 values above are used.
+if (A_Args.Length() >= 4)
+{
+	square1PosX := A_Args[1]
+	square1PosY := A_Args[2]
+	square2PosX := A_Args[3]
+	square2PosY := A_Args[4]
+}
+if (A_Args.Length() >= 6)
+{
+	tooltipPosX := A_Args[5]
+	tooltipPosY := A_Args[6]
+}
+
 
 
 ; Below this point you can change keybinds for starting and stopping fishing script
