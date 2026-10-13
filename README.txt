@@ -2,7 +2,9 @@ AFK Fishing FO76 - Visual version
 
 Requirements
 - Python 3 with: pip install mss numpy
-- AutoHotkey v2 (C:\Program Files\AutoHotkey)
+- AutoHotkey v2 and v1, installed in C:\Program Files\AutoHotkey
+  (v2 presses the keys, v1 runs the EasyFishing minigame macro - without v1
+  the 1080p-only easyFishing.exe is used instead)
 - Fishing.ba2 installed (draws the pink marker EasyFishing and this script rely on)
 - Nuka Quantum Bobber
 
